@@ -1,0 +1,69 @@
+"""
+    # Ensure the project root is on sys.path so imports work when executed directly.
+    current_file = Path(__file__).resolve()
+    project_root = current_file.parent.parent
+    if str(project_root / "src") not in sys.path:
+        sys.path.append(str(project_root / "src"))
+
+    parser = argparse.ArgumentParser(
+        description="Facebook Pages Scraper - HTML-based public page analyzer"
+    )
+    parser.add_argument(
+        "--config",
+        type=str,
+        default=None,
+        help="Path to JSON config file. Defaults to src/config/settings.example.json",
+    )
+
+    args = parser.parse_args(argv)
+
+    default_config_path = project_root / "src" / "config" / "settings.example.json"
+    config_path = Path(args.config) if args.config else default_config_path
+
+    config = _load_config(config_path)
+    _configure_logging(config.get("log_level", "INFO"))
+
+    resolved_config = _resolve_paths(config, project_root)
+    input_file: Path = resolved_config["input_file"]
+    output_directory: Path = resolved_config["output_directory"]
+    export_formats = resolved_config.get("export_formats", ["json"])
+    timeout = int(resolved_config.get("request_timeout", 10))
+    user_agent = resolved_config.get(
+        "user_agent", "Mozilla/5.0 (compatible; FacebookPagesScraper/1.0)"
+    )
+    max_pages = int(resolved_config.get("max_pages", 0))
+
+    logger = logging.getLogger("runner")
+    logger.info("Using config file at %s", config_path)
+    logger.info("Input file: %s", input_file)
+    logger.info("Output directory: %s", output_directory)
+
+    urls = _read_input_urls(input_file, max_pages=max_pages)
+    if not urls:
+        logger.warning("No page URLs found in %s. Nothing to do.", input_file)
+        return
+
+    scraper = FacebookPageScraper(timeout=timeout, user_agent=user_agent)
+
+    all_records: List[Dict[str, Any]] = []
+    for url in urls:
+        records = scraper.scrape_page(url)
+        all_records.extend(records)
+
+    if not all_records:
+        logger.warning("No records scraped from any page.")
+        return
+
+    paths = export_data(
+        records=all_records,
+        output_directory=str(output_directory),
+        formats=list(export_formats),
+    )
+
+    for fmt, path in paths.items():
+        logger.info("Exported %s data to %s", fmt.upper(), path)
+
+    logger.info("Scraping run completed successfully.")
+
+if __name__ == "__main__":
+    main()
