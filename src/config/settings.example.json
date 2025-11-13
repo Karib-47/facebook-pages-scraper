@@ -1,0 +1,9 @@
+{
+  "input_file": "data/inputs.sample.txt",
+  "output_directory": "data/output",
+  "export_formats": ["json", "csv", "xlsx"],
+  "request_timeout": 10,
+  "user_agent": "Mozilla/5.0 (compatible; FacebookPagesScraper/1.0; +https://bitbash.dev)",
+  "max_pages": 10,
+  "log_level": "INFO"
+}
